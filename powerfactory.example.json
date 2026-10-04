@@ -1,0 +1,7 @@
+{
+  "PF_PYTHON_PATH": "C:\\Program Files\\DIgSILENT\\PowerFactory 2023 SP3\\Python\\3.9",
+  "PROJECT_NAME": "\\your_user\\YourProject",
+  "GRID_NAME": "YourGrid.ElmNet",
+  "MASTER_STUDY_CASE_NAME": "SC_Master",
+  "MASTER_OPERATION_SCENARIO_NAME": "OS_Master"
+}

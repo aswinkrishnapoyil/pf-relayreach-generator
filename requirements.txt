@@ -1,0 +1,4 @@
+# Core data processing
+pandas>=2.0,<4.0       # pd.concat, pd.read_parquet, pd.ExcelWriter, pd.read_csv
+pyarrow>=14.0          # engine="pyarrow" in to_parquet/read_parquet
+openpyxl>=3.1          # ExcelWriter mode="w", read_excel for audit sheet

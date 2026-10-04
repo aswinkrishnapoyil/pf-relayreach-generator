@@ -1,0 +1,74 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build/package artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs
+logs/
+*.log
+
+# Generated dataset outputs
+Results/
+*.parquet
+*.xlsx
+
+# Optional large/generated data files
+*.feather
+*.h5
+*.hdf5
+
+# IDE/editor files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# PowerFactory/local project files
+*.pfd
+*.IntPrj
+*.dz
+*.pfdx
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+~$*
+
+# Machine-specific PowerFactory connection settings
+/powerfactory.local.json
+.env
+.env.*
+!.env.example
+
+# Historical patches and local configuration/library backups
+*.zip
+*.7z
+*.rar
+/pf_adaptive_distance_dataset/core/config - *.py
+/switch_state/*.csv
+!/switch_state/switch_states.example.csv
+/audit_switch_state_applicability.py
+/export_switch_inventory.py
+/merge_221_122_graphs.py
+/validate_switch_state_mapping.py
+
+# Interrupted exports and test/tool caches
+*.partial
+.pytest_cache/
+.coverage
+htmlcov/

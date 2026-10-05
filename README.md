@@ -1,4 +1,4 @@
-# PF RelayReach Generator
+# PowerFactory based Adaptive Distance Protection Dataset Generator
 
 [![Offline regression tests](https://github.com/aswinkrishnapoyil/pf-relayreach-generator/actions/workflows/tests.yml/badge.svg)](https://github.com/aswinkrishnapoyil/pf-relayreach-generator/actions/workflows/tests.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
@@ -8,15 +8,15 @@ distance-protection reach settings in PowerFactory grids with distributed
 generation (DG).
 
 The pipeline connects to a live **DIgSILENT PowerFactory** installation,
-evaluates switch-state topologies and randomized line/DG realizations,
-calculates relay-zone reaches and short-circuit-based infeed corrections, and
-exports one graph-array Parquet row per accepted scenario. Flat rows, audit
+evaluates switch state topologies and randomized line/DG cases,
+calculates relay zone reaches and short circuit based infeed corrections, and
+exports one graph array Parquet row per accepted scenario. Flat rows, audit
 workbooks and randomization logs are retained with the batch files for
 traceability.
 
 This repository contains the generator only. It does **not** contain an ML
-model, a PowerFactory grid, PowerFactory binaries or a grid-specific
-switch-state library.
+model, a PowerFactory grid, PowerFactory binaries or a grid specific
+switch state library.
 
 ---
 
@@ -38,7 +38,7 @@ pf-relayreach-generator/
 │   ├── pf_api/
 │   │   ├── pf_session.py                  # PowerFactory session lifecycle
 │   │   ├── pf_utils.py                    # checked object/attribute access
-│   │   ├── slave_cases.py                 # temporary study-case lifecycle
+│   │   ├── slave_cases.py                 # temporary study case lifecycle
 │   │   ├── state_capture.py               # baseline state capture
 │   │   └── grid_state.py                  # checked state restoration
 │   ├── domain/
@@ -46,7 +46,7 @@ pf-relayreach-generator/
 │   │   ├── network_topology.py            # corridors, branches and parallels
 │   │   ├── dg_utils.py                    # DG discovery and capacity handling
 │   │   ├── zone_reach.py                  # Zone 1/2/3 reach calculations
-│   │   └── infeed.py                      # DG short-circuit infeed correction
+│   │   └── infeed.py                      # DG short circuit infeed correction
 │   ├── pipeline/
 │   │   ├── batch_orchestrator.py          # workers, restart, resume and merge
 │   │   ├── dataset_generator.py           # base/randomized scenario loop
@@ -219,7 +219,7 @@ RESUME_RUN_ID = None
 ```
 
 Each batch uses a fresh worker and PowerFactory engine session. Increasing the
-batch size reduces startup overhead but keeps more work in one session; it does
+batch size reduces startup overhead but keeps more work in one session. It does
 not fix an electrically invalid case or a PowerFactory startup problem.
 
 ---
@@ -256,15 +256,15 @@ For each batch, the generator:
 1. Loads and validates the requested switch-state rows.
 2. Opens a fresh PowerFactory engine session and activates the configured
    project, grid, study case and operation scenario.
-3. Creates a temporary slave study-case/operation-scenario pair for each switch
+3. Creates a temporary slave study case/operation scenario pair for each switch
    state.
 4. Captures the baseline grid state and applies the complete switch request with
-   checked write-back.
+   checked write back.
 5. Evaluates the optional base case and each randomized realization.
 6. Discovers protected corridors, downstream branches, parallel circuits and
    eligible DG sources.
-7. Calculates Zone 1/2/3 reaches and executes the required one-DG-at-a-time
-   short-circuit calculations for infeed correction.
+7. Calculates Zone-1/2/3 reaches and executes the required one-DG-at-a-time
+   short circuit calculations for infeed correction.
 8. Builds validated flat relay rows and one graph-array row per accepted
    scenario.
 9. Restores all changed PowerFactory state and deletes the temporary slave
@@ -279,7 +279,7 @@ enables verbose logging.
 
 ## Implemented protection policies
 
-These are dataset target-generation rules. Agreement with the exported labels
+These are dataset target generation rules. Agreement with the exported labels
 does not certify relay coordination, time grading, directional operation or
 transient performance.
 
@@ -287,11 +287,11 @@ transient performance.
 
 When no valid downstream branch exists:
 
-- base Zone 1 is `0.85` times the protected-corridor impedance;
-- base Zone 2 is `1.20` times the protected-corridor impedance;
+- base Zone-1 is `0.85` times the protected corridor impedance.
+- base Zone-2 is `1.20` times the protected corridor impedance.
 - Zone 3 is inapplicable.
 
-Applicable embedded-DG corrections are added afterward. A DG at the remote
+Applicable embedded DG corrections are added afterward. A DG at the remote
 terminal is excluded from correction when no valid downstream fault location
 exists, but remains represented in the topology and DG features.
 
@@ -299,7 +299,7 @@ Terminal relay queries contain null Zone-3 targets and
 `zone3_applicable = 0`. ML consumers must therefore use the target mask
 `[1, 1, 1, 1, 0, 0]`; numerical zero is not a Zone-3 label.
 
-### Extreme corrected Zone 2
+### Extreme corrected Zone-2
 
 For every directed relay with nonzero base Zone-2 impedance:
 
@@ -365,18 +365,18 @@ must not be used as predictive inputs.
 
 `bus_typ` is categorical:
 
-| Code | Meaning |
-| ---: | --- |
-| 101 | Plain/load/tie bus |
-| 103 | Synchronous DG bus |
-| 107 | PV/inverter DG bus |
-| 109 | Mixed DG bus |
+| Code | Meaning                 |
+| ---: |-------------------------|
+| 101 | Load/tie bus            |
+| 103 | Synchronous DG bus      |
+| 107 | PV/inverter DG bus      |
+| 109 | Mixed DG bus            |
 | 113 | External-grid/slack bus |
-| 127 | Transformer HV bus |
-| 131 | Transformer LV bus |
-| 137 | Junction node |
+| 127 | Transformer HV bus      |
+| 131 | Transformer LV bus      |
+| 137 | Junction node           |
 
-Use typed encoders, one-hot values or an explicit mapping to embedding indices.
+Use typed encoders, one hot values or an explicit mapping to embedding indices.
 The sparse codes are labels, not continuous measurements.
 
 ---
@@ -409,10 +409,9 @@ logs/
 ```
 
 Only the graph Parquets are merged across batches. Supporting flat CSV, Excel,
-randomization and statistics files remain batch-level audit material. There is
-no separate “ML-ready” dataset variant.
+randomization and statistics files remain batch-level audit material.
 
-The final manifest records the random seed, switch-library SHA-256 hash, policy
+The final manifest records the random seed, switch library SHA-256 hash, policy
 signature, batch accounting and final outputs. It remains available when batch
 files are deleted.
 

@@ -1294,6 +1294,9 @@ def generate_dataset_cases(
                 )
 
                 if b_persistent_zone2_failure:
+                    # The base may already carry its own skip record (Zone-2
+                    # ratio or short-circuit failure). Replace it so the
+                    # merged report holds one record per scenario_uid.
                     l_switch_state_payloads = [
                         o_payload
                         for o_payload in l_switch_state_payloads

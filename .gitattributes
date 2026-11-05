@@ -8,3 +8,6 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 *.csv text eol=lf
+# Keep the 14-bus switch-state library byte-identical (its SHA-256 is recorded in run manifests)
+switch_state/switch_states.csv -text
+*.pfd binary

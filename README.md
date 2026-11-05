@@ -14,9 +14,26 @@ exports one graph array Parquet row per accepted scenario. Flat rows, audit
 workbooks and randomization logs are retained with the batch files for
 traceability.
 
-This repository contains the generator only. It does **not** contain an ML
-model, a PowerFactory grid, PowerFactory binaries or a grid specific
-switch state library.
+The repository contains the generator, the modified IEEE 14-bus 110 kV
+development grid as a PowerFactory export (`grid/Modified_IEEE14_110kV_FAU.pfd`)
+and its 216-state switch-state library (`switch_state/switch_states.csv`). With
+the default configuration it regenerates the 14-bus development dataset of the
+MSc thesis. It does **not** contain an ML model or PowerFactory binaries.
+
+### Version v3.4.0
+
+- Zone 3 selects the valid downstream branch with the **largest reactance**;
+  Zone 2 keeps the branch with the smallest reactance. Ties are broken by
+  length, then resistance. Earlier versions selected the Zone-3 branch by
+  length in km, which can pick a branch of lower impedance when line types
+  differ. This changes Zone-3 targets and the `longest_downstream_branch_*`
+  features, so datasets of earlier versions must be regenerated.
+- The Zone-2 admissibility rule `q2 >= 2` applies to base and randomized
+  scenarios alike; only randomized failures count toward the persistent
+  switch-state rule, and a dropped switch state reports its base scenario once.
+- Defaults for the 14-bus development grid: project
+  `Modified_IEEE14_110kV_FAU`, grid `Grid_110kV.ElmNet`, random seed base
+  `20260929`, one switch state per PowerFactory worker.
 
 ---
 
@@ -25,10 +42,15 @@ switch state library.
 ```text
 pf-relayreach-generator/
 ├── main_script.py                         # pipeline entry point
+├── export_switch_inventory.py             # lists the switches of a grid (for new libraries)
+├── time_generation_steps.py               # times the generation steps per case
 ├── powerfactory.example.json              # local connection template
 ├── requirements.txt
 ├── LICENSE
+├── grid/
+│   └── Modified_IEEE14_110kV_FAU.pfd      # 14-bus development grid (PowerFactory export)
 ├── switch_state/
+│   ├── switch_states.csv                  # 216 switch states of the 14-bus grid
 │   └── switch_states.example.csv          # neutral input-format example
 ├── pf_adaptive_distance_dataset/
 │   ├── core/
@@ -73,7 +95,9 @@ pf-relayreach-generator/
   Python 3.9.
 - `pandas`, `pyarrow` and `openpyxl` from `requirements.txt`.
 - A PowerFactory project containing a target grid, master study case, master
-  operation scenario and compatible switch-state library.
+  operation scenario and compatible switch-state library. For the 14-bus
+  development grid, import `grid/Modified_IEEE14_110kV_FAU.pfd` (PowerFactory:
+  *File > Import > PFD*) into your PowerFactory user.
 
 Install the Python dependencies:
 
@@ -89,7 +113,10 @@ PowerFactory and its Python API are not installed by this command.
 
 ### 1. Configure the local PowerFactory connection
 
-Copy the public template:
+The defaults in `config.py` match the 14-bus development grid imported from
+`grid/Modified_IEEE14_110kV_FAU.pfd` into the current PowerFactory user. If
+your PowerFactory installation, project name or grid differ, override them
+locally. Copy the public template:
 
 ```powershell
 Copy-Item .\powerfactory.example.json .\powerfactory.local.json
@@ -113,7 +140,16 @@ Generation, randomization, batching and protection policies remain in
 
 ### 2. Provide a switch-state library
 
-No real switch identifiers are published. Copy the neutral schema example:
+For the 14-bus development grid, `switch_state/switch_states.csv` is included:
+the 216 switch states of the thesis dataset. Its switch columns use
+user-independent IDs (see below), so the library works in the project imported
+from `grid/Modified_IEEE14_110kV_FAU.pfd` by any PowerFactory user. The switch
+states are identical to the library of the thesis run (SHA-256
+`3ade501b308efa7e…`), which used user-bound IDs of the same switches.
+
+For another grid, replace it with that grid's library. The neutral schema
+example shows the format, and `export_switch_inventory.py` lists the switch
+identifiers of the configured grid:
 
 ```powershell
 Copy-Item .\switch_state\switch_states.example.csv `
@@ -121,8 +157,7 @@ Copy-Item .\switch_state\switch_states.example.csv `
 ```
 
 Replace the example column and row with identifiers and states from the target
-grid. The active file is ignored by Git because the identifiers are
-grid-specific.
+grid. Other files in `switch_state/` are ignored by Git.
 
 ```text
 ConfigID;switch_<identifier_1>;switch_<identifier_2>
@@ -134,6 +169,18 @@ Every `switch_...` value must be numeric `0` (open) or `1` (closed). Identifiers
 may be native switch/cubicle CIM RDF IDs or the deterministic UUID format
 supported by the generator. Every column must resolve unambiguously to exactly
 one cubicle switch in the configured grid.
+
+The deterministic UUID is built from the project name, the grid name and the
+full PowerFactory names of the switch and its cubicle. Since v3.4.0 the
+generator accepts two forms: the **user-independent** form, in which the
+leading user folder (`\<user>.IntUser`) is removed from the full names, and the
+user-bound form of older libraries, which is valid only for the user who
+created the library. Use the user-independent form for new libraries; the
+`user_independent_switch_id` column of the inventory lists it:
+
+```powershell
+python -B .\export_switch_inventory.py --output .\Results\switch_inventory.csv
+```
 
 Before dataset generation, verify the library against a non-production copy of
 the project and confirm switch application, electrical validity and
@@ -197,7 +244,7 @@ ENABLE_DG_CAPACITY_RANDOMIZATION = True
 DG_CAPACITY_SCALE_MIN = 0.8
 DG_CAPACITY_SCALE_MAX = 1.2
 
-RANDOM_SEED_BASE = 20260915
+RANDOM_SEED_BASE = 20260929
 DG_CAPACITY_RANDOM_SEED_OFFSET = 100000
 ```
 
@@ -282,6 +329,13 @@ enables verbose logging.
 These are dataset target generation rules. Agreement with the exported labels
 does not certify relay coordination, time grading, directional operation or
 transient performance.
+
+### Downstream branch selection
+
+Valid downstream branches exclude the relay-return direction and lines of
+parallel protected corridors. Zone 2 uses the valid branch with the smallest
+reactance, Zone 3 the one with the largest reactance; ties are broken by
+length, then resistance.
 
 ### Terminal corridors
 
@@ -439,6 +493,20 @@ force-stop protection calculations or restoration.
 Failed runs retain `Results/_batch_tmp/<run_id>/`. Resume validates completed
 batches and rejects changes to the switch CSV hash, seed or generation-policy
 signature. A run ID is a timestamp identifier, not a filesystem path.
+
+---
+
+## Timing the generation steps
+
+`time_generation_steps.py` runs a small generation (default: switch states 1–3,
+the base case and four randomized cases each) in one PowerFactory session and
+records how long each step of every case takes. The generator code is not
+modified; the timers are attached in memory and the output goes to
+`Results/step_timing_<time>/`.
+
+```powershell
+python -B .\time_generation_steps.py --generator .
+```
 
 ---
 

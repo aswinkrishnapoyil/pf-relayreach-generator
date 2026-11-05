@@ -52,14 +52,17 @@ class RandomizedShortCircuitSkipTest(unittest.TestCase):
             if d_failure["kind"] == "base_execution" and d_kwargs["is_base"]:
                 raise ShortCircuitExecutionError("base ComShc failed")
             if (
-                    (
-                        d_failure["kind"] == "all_extreme_zone2"
-                        and not d_kwargs["is_base"]
+                    d_failure["kind"] in (
+                        "base_extreme_zone2",
+                        "base_and_all_extreme_zone2",
                     )
-                    or (
-                        d_failure["kind"] == "base_extreme_zone2"
-                        and d_kwargs["is_base"]
+                    and d_kwargs["is_base"]
+            ) or (
+                    d_failure["kind"] in (
+                        "all_extreme_zone2",
+                        "base_and_all_extreme_zone2",
                     )
+                    and not d_kwargs["is_base"]
             ):
                 d_kwargs["scenario_yields"].extend([
                     ExportPayload(kind="flat_row", data={
@@ -207,6 +210,26 @@ class RandomizedShortCircuitSkipTest(unittest.TestCase):
                 [o_payload.kind for o_payload in l_payloads],
                 ["skipped_scenario", "skipped_scenario", "skipped_scenario"],
             )
+            self.assertEqual(
+                l_payloads[0].data["reason"],
+                "persistent_switch_state_extreme_zone2",
+            )
+            self.assertEqual(l_payloads[0].data["evaluated_randomizations"], 2)
+            self.assertEqual(l_payloads[0].data["failed_randomizations"], 2)
+
+            # A base failure must not count toward the persistent rule, and the
+            # dropped base must be reported exactly once.
+            d_failure["kind"] = "base_and_all_extreme_zone2"
+            l_payloads = list(generator.generate_dataset_cases(
+                o_session, DatasetStatistics(), df_states, ["switch_1"]
+            ))
+            self.assertEqual(
+                [o_payload.kind for o_payload in l_payloads],
+                ["skipped_scenario", "skipped_scenario", "skipped_scenario"],
+            )
+            l_uids = [o_payload.data["scenario_uid"] for o_payload in l_payloads]
+            self.assertEqual(len(l_uids), len(set(l_uids)))
+            self.assertEqual(l_payloads[0].data["scenario_uid"], "ss_0001_base_0000")
             self.assertEqual(
                 l_payloads[0].data["reason"],
                 "persistent_switch_state_extreme_zone2",

@@ -276,6 +276,43 @@ class SwitchAwareFilteringTest(unittest.TestCase):
         o_line = FakePowerFactoryObject("Line", "ElmLne", attrs={PFAttr.IKSS_BUS1: 0.0, PFAttr.IKSS: 100.0})
         self.assertEqual(infeed.read_relay_reference_ikss(None, o_line, PFAttr.IKSS_BUS1), (0.0, f"line.{PFAttr.IKSS_BUS1}"))
 
+    def test_user_independent_switch_id_survives_import_by_another_user(self):
+        def make_grid(s_user):
+            s_root = f"\\{s_user}.IntUser\\ExampleProject.IntPrj\\Grid_110kV.ElmNet"
+            o_grid = FakePowerFactoryObject("Grid_110kV", "ElmNet", full_name=s_root)
+            o_terminal = FakePowerFactoryObject(
+                "Terminal_HV_2", "ElmTerm", full_name=f"{s_root}\\Terminal_HV_2.ElmTerm", parent=o_grid,
+            )
+            o_switch = FakePowerFactoryObject(
+                "Switch", "StaSwitch",
+                full_name=f"{s_root}\\Terminal_HV_2.ElmTerm\\Cub_1.StaCubic\\Switch.StaSwitch",
+                attrs={PFAttr.SWITCH_STATE: 1},
+            )
+            o_cubicle = FakePowerFactoryObject(
+                "Cub_1", "StaCubic", full_name=f"{s_root}\\Terminal_HV_2.ElmTerm\\Cub_1.StaCubic",
+                attrs={PFAttr.CTERM: o_terminal}, children=[o_switch],
+            )
+            return o_grid, o_switch, o_cubicle
+
+        o_project = FakePowerFactoryObject("ExampleProject", "IntPrj")
+        o_grid_a, o_switch_a, o_cubicle_a = make_grid("author")
+        o_grid_b, o_switch_b, o_cubicle_b = make_grid("other_user")
+
+        s_id_author = switch_states._get_generated_switch_identifier(
+            o_switch_a, o_cubicle_a, "ExampleProject", "Grid_110kV", user_independent=True,
+        )
+        s_legacy_author = generated_switch_id("ExampleProject", "Grid_110kV", o_switch_a, o_cubicle_a)
+        self.assertNotEqual(s_id_author, s_legacy_author)
+
+        # A library written by 'author' resolves in the project imported by 'other_user' ...
+        d_lookup_b = build_cubicle_lookup(FakeApplication(o_project, [o_cubicle_b]), o_grid_b)
+        self.assertIs(d_lookup_b[s_id_author], o_cubicle_b)
+        self.assertNotIn(s_legacy_author, d_lookup_b)
+        # ... and the user-bound IDs of older libraries still resolve for their author.
+        d_lookup_a = build_cubicle_lookup(FakeApplication(o_project, [o_cubicle_a]), o_grid_a)
+        self.assertIs(d_lookup_a[s_legacy_author], o_cubicle_a)
+        self.assertIs(d_lookup_a[s_id_author], o_cubicle_a)
+
     def test_generated_uuid_switch_state_column_maps_to_cubicle(self):
         project = FakePowerFactoryObject("ExampleProject", "IntPrj")
         grid = FakePowerFactoryObject(

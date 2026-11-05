@@ -38,6 +38,7 @@ Thumbs.db
 
 # PowerFactory/local project files
 *.pfd
+!/grid/Modified_IEEE14_110kV_FAU.pfd
 *.IntPrj
 *.dz
 *.pfdx
@@ -62,8 +63,8 @@ Thumbs.db
 /pf_adaptive_distance_dataset/core/config - *.py
 /switch_state/*.csv
 !/switch_state/switch_states.example.csv
+!/switch_state/switch_states.csv
 /audit_switch_state_applicability.py
-/export_switch_inventory.py
 /merge_221_122_graphs.py
 /validate_switch_state_mapping.py
 

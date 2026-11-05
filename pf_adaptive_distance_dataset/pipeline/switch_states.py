@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import uuid
 
 import pandas as pd
@@ -90,25 +91,46 @@ def _get_active_project_name(app):
         return ""
 
 
-def _get_generated_switch_identifier(switch, cubicle, project_name, grid_name):
+RE_USER_FOLDER = re.compile(r"^\\[^\\]+\.IntUser(?=\\)")
+
+
+def _strip_user_folder(full_name):
+    """
+    Removes the leading PowerFactory user folder ('\\<user>.IntUser') from a
+    full object name, so that a project imported by another user yields the
+    same name.
+    """
+
+    return RE_USER_FOLDER.sub("", str(full_name or ""))
+
+
+def _get_generated_switch_identifier(
+        switch, cubicle, project_name, grid_name, user_independent=False,
+):
     """
     Rebuilds the deterministic UUID used by manual switch-state libraries when
     PowerFactory objects do not expose native CIM RDF IDs.
+
+    With user_independent=True, the PowerFactory user folder is removed from
+    the full names first, so the identifier stays valid when the project is
+    exported and imported by another user. Without it, the identifier of
+    libraries created before v3.4.0 is returned.
     """
 
     if switch is None or cubicle is None:
         return ""
 
+    f_name = _strip_user_folder if user_independent else str
     s_identity_string = (
         "powerfactory://"
         f"{project_name}|"
         f"{grid_name}|"
         "switch="
         f"{get_safe_class_name(switch)}:"
-        f"{get_safe_full_name(switch)}|"
+        f"{f_name(get_safe_full_name(switch))}|"
         "reference="
         f"{get_safe_class_name(cubicle)}:"
-        f"{get_safe_full_name(cubicle)}"
+        f"{f_name(get_safe_full_name(cubicle))}"
     )
 
     return str(uuid.uuid5(uuid.NAMESPACE_URL, s_identity_string))
@@ -214,16 +236,20 @@ def build_cubicle_lookup(app, grid=None):
             o_cubicle,
         )
 
-        _add_cubicle_lookup_key(
-            d_cubicle_lookup,
-            _get_generated_switch_identifier(
-                o_switch,
+        # Generated IDs: user-independent form and the user-bound form of
+        # libraries created before v3.4.0.
+        for b_user_independent in (True, False):
+            _add_cubicle_lookup_key(
+                d_cubicle_lookup,
+                _get_generated_switch_identifier(
+                    o_switch,
+                    o_cubicle,
+                    s_project_name,
+                    s_grid_name,
+                    user_independent=b_user_independent,
+                ),
                 o_cubicle,
-                s_project_name,
-                s_grid_name,
-            ),
-            o_cubicle,
-        )
+            )
 
     return d_cubicle_lookup
 

@@ -22,7 +22,8 @@ from .network_topology import (
 
 def select_parallel_branch_for_complex_zone2(sel_branch, par_branches):
     """
-    Selects the shortest valid parallel branch alternative for complex Zone 2 reach.
+    Selects the shortest (smallest-reactance) valid parallel branch alternative
+    for complex Zone 2 reach.
     The selected branch itself is excluded. Branch identity is compared using
     branch line names, matching the original implementation.
     """
@@ -53,6 +54,12 @@ def select_parallel_branch_for_complex_zone2(sel_branch, par_branches):
 def select_zone3_longest_valid_downstream_branch(corr, l_all_corridors=None, l_valid_branches=None):
     """
     Selects the longest valid downstream branch for Zone 3 reach.
+
+    "Longest" is electrical: the branch with the largest reactance, mirroring
+    Zone 2, which selects the branch with the smallest reactance. Length and
+    then resistance break ties. Selecting by km alone can pick a branch with a
+    lower impedance than another adjacent branch when line types differ, so
+    Zone 3 would not reach the remote end of that branch.
     """
 
     d_corridor = corr
@@ -74,8 +81,9 @@ def select_zone3_longest_valid_downstream_branch(corr, l_all_corridors=None, l_v
     return sorted(
         l_valid_downstream_branches,
         key=lambda d_branch: (
-            float(d_branch.get("Branch Length", 0.0)),
             float(d_branch.get("Branch Reactance", 0.0)),
+            float(d_branch.get("Branch Length", 0.0)),
+            float(d_branch.get("Branch Resistance", 0.0)),
         ),
         reverse=True,
     )[0]

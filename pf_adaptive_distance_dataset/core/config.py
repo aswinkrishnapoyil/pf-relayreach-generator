@@ -25,9 +25,11 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 class Config:
     # Local connection settings may override these in powerfactory.local.json.
+    # Defaults: the modified IEEE 14-bus project of grid/Modified_IEEE14_110kV_FAU.pfd,
+    # imported into the current PowerFactory user.
     PF_PYTHON_PATH = r"C:\Program Files\DIgSILENT\PowerFactory 2023 SP3\Python\3.9"
-    PROJECT_NAME = r"\your_user\YourProject"
-    GRID_NAME = "YourGrid.ElmNet"
+    PROJECT_NAME = "Modified_IEEE14_110kV_FAU"
+    GRID_NAME = "Grid_110kV.ElmNet"
 
     MASTER_STUDY_CASE_NAME = "SC_Master"
     MASTER_OPERATION_SCENARIO_NAME = "OS_Master"
@@ -35,7 +37,7 @@ class Config:
     SLAVE_STUDY_CASE_PREFIX = "SC_Slave"
     SLAVE_OPERATION_SCENARIO_PREFIX = "OS_Slave"
 
-    DATASET_VERSION = "v3.3.2"
+    DATASET_VERSION = "v3.4.0"
     DATASET_EXPORT_TYPE = "streaming_graph_array_with_metadata"
 
     # --- Normal Run Controls (used when main_script.py is launched directly) ---
@@ -79,7 +81,8 @@ class Config:
     DG_CAPACITY_SCALE_MIN = 0.8
     DG_CAPACITY_SCALE_MAX = 1.2
 
-    RANDOM_SEED_BASE: Optional[int] = 20260915  # Set as None to get auto generated seed base
+    # 20260929 reproduces the line/DG realizations of the 14-bus development dataset.
+    RANDOM_SEED_BASE: Optional[int] = 20260929  # Set as None to get auto generated seed base
     DG_CAPACITY_RANDOM_SEED_OFFSET = 100000
 
     @classmethod

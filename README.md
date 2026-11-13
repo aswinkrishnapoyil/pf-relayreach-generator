@@ -20,48 +20,6 @@ and its 216-state switch-state library (`switch_state/switch_states.csv`). With
 the default configuration it regenerates the 14-bus development dataset of the
 MSc thesis. It does **not** contain an ML model or PowerFactory binaries.
 
-### Version v3.4.2
-
-- The helper scripts `export_switch_inventory.py`,
-  `check_switch_state_islands.py` and `time_generation_steps.py` moved to
-  `tools/`. Run them from the repository root, e.g.
-  `python -B .\tools\export_switch_inventory.py`. Their options are unchanged;
-  `--generator` of the timing script now defaults to this repository.
-- No change to the generation rules or the dataset. Apart from
-  `dataset_version`, a v3.4.2 run gives the same data as v3.4.1.
-
-### Version v3.4.1
-
-- New **islanding check**. A switch state that leaves any busbar or junction
-  node of the traced grid without a connection to an external grid
-  (`ElmXnet`) is omitted completely, with reason `islanded_switch_state`.
-  In v3.4.0 the relays in such an island were exported as ordinary terminal
-  corridors (Zone 2 at 120 % of the corridor, no Zone 3, no infeed
-  correction), although the island has no grid supply. In the 14-bus library
-  this concerns `ss_0180` (busbars 7 and 8) and `ss_0192` (busbars 10 and 11).
-  See [Islanded switch states](#islanded-switch-states).
-- New script `check_switch_state_islands.py` lists the islanded switch states
-  of a library offline, before a run.
-- `export_switch_inventory.py` adds the columns `connected_object_outserv` and
-  `connected_object_terminal_full_names`, which the offline check needs.
-- No setting rule changes. A v3.4.0 dataset is valid for v3.4.1 once the
-  scenarios of islanded switch states are removed.
-
-### Version v3.4.0
-
-- Zone 3 selects the valid downstream branch with the **largest reactance**;
-  Zone 2 keeps the branch with the smallest reactance. Ties are broken by
-  length, then resistance. Earlier versions selected the Zone-3 branch by
-  length in km, which can pick a branch of lower impedance when line types
-  differ. This changes Zone-3 targets and the `longest_downstream_branch_*`
-  features, so datasets of earlier versions must be regenerated.
-- The Zone-2 admissibility rule `q2 >= 2` applies to base and randomized
-  scenarios alike; only randomized failures count toward the persistent
-  switch-state rule, and a dropped switch state reports its base scenario once.
-- Defaults for the 14-bus development grid: project
-  `Modified_IEEE14_110kV_FAU`, grid `Grid_110kV.ElmNet`, random seed base
-  `20260929`, one switch state per PowerFactory worker.
-
 ---
 
 ## Repository structure
@@ -145,8 +103,9 @@ PowerFactory and its Python API are not installed by this command.
 ### 1. Configure the local PowerFactory connection
 
 The defaults in `config.py` match the 14-bus development grid imported from
-`grid/Modified_IEEE14_110kV_FAU.pfd` into the current PowerFactory user. If
-your PowerFactory installation, project name or grid differ, override them
+`grid/Modified_IEEE14_110kV_FAU.pfd` into the current PowerFactory user.
+The default project is `Modified_IEEE14_110kV_FAU` and the default grid is `Grid_110kV.ElmNet`.
+If your PowerFactory installation, project name or grid differ, override them
 locally. Copy the public template:
 
 ```powershell
@@ -202,9 +161,8 @@ supported by the generator. Every column must resolve unambiguously to exactly
 one cubicle switch in the configured grid.
 
 The deterministic UUID is built from the project name, the grid name and the
-full PowerFactory names of the switch and its cubicle. Since v3.4.0 the
-generator accepts two forms: the **user-independent** form, in which the
-leading user folder (`\<user>.IntUser`) is removed from the full names, and the
+full PowerFactory names of the switch and its cubicle. The generator accepts the
+**user-independent** form, in which the leading user folder (`\<user>.IntUser`) is removed from the full names, and the
 user-bound form of older libraries, which is valid only for the user who
 created the library. Use the user-independent form for new libraries; the
 `user_independent_switch_id` column of the inventory lists it:
@@ -229,7 +187,10 @@ switch states. Input files are never changed and existing output files are
 never overwritten. The generator omits islanded switch states in any case;
 the script only lets you see and clean them beforehand.
 
-The inventory must come from `export_switch_inventory.py` v3.4.1 or later.
+The offline check requires the `connected_object_outserv` and
+`connected_object_terminal_full_names` columns written by
+`tools/export_switch_inventory.py`. Re-export any inventory missing them.
+
 Limits of the offline check, which the generator's own check does not have:
 a line without any switch does not appear in the inventory and can make a
 supplied part look like an island; an external grid outside the configured
@@ -361,7 +322,8 @@ For each batch, the generator:
    state.
 4. Captures the baseline grid state and applies the complete switch request with
    checked write back.
-5. Evaluates the optional base case and each randomized realization.
+5. Checks the applied topology for islands, then evaluates the optional base
+   case and each randomized realization for supplied switch states.
 6. Discovers protected corridors, downstream branches, parallel circuits and
    eligible DG sources.
 7. Calculates Zone-1/2/3 reaches and executes the required one-DG-at-a-time
@@ -388,8 +350,9 @@ transient performance.
 
 Valid downstream branches exclude the relay-return direction and lines of
 parallel protected corridors. Zone 2 uses the valid branch with the smallest
-reactance, Zone 3 the one with the largest reactance; ties are broken by
-length, then resistance.
+reactance. Zone 3 uses the valid branch with the largest reactance. Ties are
+broken by length, then resistance. The `longest_downstream_branch_*` fields
+describe the branch selected for Zone 3 by reactance.
 
 ### Terminal corridors
 
@@ -421,9 +384,10 @@ and configured threshold. Other realizations of the same switch state remain
 eligible.
 
 When at least 25 randomized realizations are evaluated and every one fails this
-rule, the switch state contributes no scenario, including its base case. This
-is a supervisor-approved dataset-admissibility rule, not a universal
-relay-setting limit. The generator does not cap Zone 2, remove only the failing
+rule, the switch state contributes no scenario. Only randomized realizations
+count toward this rule. If the base case is enabled, it receives exactly one
+`persistent_switch_state_extreme_zone2` skip record, replacing any earlier
+skip record for that case. The threshold is a dataset-admissibility rule. The generator does not cap Zone 2, remove only the failing
 relay, or force Zone-2/Zone-3 ordering.
 
 ### Islanded switch states
@@ -455,6 +419,9 @@ the coverage check of the batch still holds:
   "island_terminals": [["Terminal_HV_7", "Terminal_HV_8"]]
 }
 ```
+
+In the bundled 14-bus library, `ss_0180` isolates busbars 7 and 8, and
+`ss_0192` isolates busbars 10 and 11.
 
 A busbar that is cut off from every line is not reported, because no relay is
 traced there.
@@ -558,6 +525,11 @@ The final manifest records the random seed, switch library SHA-256 hash, policy
 signature, batch accounting and final outputs. It remains available when batch
 files are deleted.
 
+Regenerate datasets produced with length-based Zone 3 branch selection to
+update the reach targets and branch features. For datasets that already use
+reactance-based branch selection but predate the islanding check, remove all
+scenarios from islanded switch states before reuse.
+
 ---
 
 ## Running and resuming
@@ -596,6 +568,9 @@ modified; the timers are attached in memory and the output goes to
 ```powershell
 python -B .\tools\time_generation_steps.py
 ```
+
+`--generator` defaults to this repository. Run the command from the
+repository root so its relative paths resolve correctly.
 
 ---
 

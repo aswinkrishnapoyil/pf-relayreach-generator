@@ -47,6 +47,12 @@ from .switch_states import (
 
 from .case_features import get_corridor_scenario_rows
 
+from ..domain.islanding import (
+    ISLANDED_SWITCH_STATE_REASON,
+    find_live_unsupplied_islands,
+    format_islands,
+)
+
 from ..pf_api.state_capture import (
     capture_original_state_from_active_slave,
     capture_bus_attributes,
@@ -343,6 +349,83 @@ def _restore_and_apply_switch_state(
         objs=l_outserv_controlled_objects,
         orig_states=d_original_outserv_states,
     )
+
+
+def _find_switch_state_islands(
+        grid,
+        app,
+        row: Any,
+        cfg: str,
+        cub_lookup: dict,
+        out_objs: list,
+        orig_lines: dict,
+        orig_dgs: dict,
+        orig_out: dict,
+        orig_sw: dict,
+) -> list[list[str]]:
+    """
+    Applies the switch state once and returns its unsupplied islands.
+
+    Line and DG randomisation do not change the topology, so one check per
+    switch state covers the base and all randomised scenarios. The slave
+    grid is restored afterwards.
+    """
+
+    try:
+        _restore_and_apply_switch_state(
+            row=row,
+            cfg=cfg,
+            cub_lookup=cub_lookup,
+            out_objs=out_objs,
+            orig_lines=orig_lines,
+            orig_dgs=orig_dgs,
+            orig_out=orig_out,
+            orig_sw=orig_sw,
+        )
+        return find_live_unsupplied_islands(grid, app)
+
+    finally:
+        restore_grid_state(
+            orig_lines=orig_lines,
+            orig_dgs=orig_dgs,
+            orig_out=orig_out,
+            orig_sw=orig_sw,
+        )
+
+
+def _build_islanded_switch_state_payloads(
+        sid: str,
+        cfg: str,
+        global_idx: int,
+        islands: list[list[str]],
+) -> list[ExportPayload]:
+    """
+    Builds one omission record per scenario of an islanded switch state.
+
+    Every scenario gets its own record so that the batch coverage check
+    (graph rows plus recorded omissions = expected scenarios) still holds.
+    """
+
+    s_detail = (
+        "Switch state leaves busbars without a connection to any external "
+        f"grid: {format_islands(islands)}"
+    )
+    l_payloads = []
+    for _, _, s_scenario_id in _iter_scenarios():
+        l_payloads.append(
+            ExportPayload(
+                kind="skipped_scenario",
+                data={
+                    "scenario_uid": f"{sid}_{s_scenario_id}",
+                    "switch_state_row_index": global_idx + 1,
+                    "switch_state_config_id": cfg,
+                    "reason": ISLANDED_SWITCH_STATE_REASON,
+                    "detail": s_detail,
+                    "island_terminals": [list(l_island) for l_island in islands],
+                },
+            )
+        )
+    return l_payloads
 
 
 def _get_scenario_seeds(
@@ -1141,6 +1224,36 @@ def generate_dataset_cases(
                     o_grid,
                     o_app,
                 )
+
+                l_islands = _find_switch_state_islands(
+                    grid=o_grid,
+                    app=o_app,
+                    row=d_switch_state_row,
+                    cfg=s_switch_state_config_id,
+                    cub_lookup=d_cubicle_lookup,
+                    out_objs=l_outserv_controlled_objects,
+                    orig_lines=d_original_line_states,
+                    orig_dgs=d_original_dg_states,
+                    orig_out=d_original_outserv_states,
+                    orig_sw=d_original_switch_states,
+                )
+
+                if l_islands:
+                    logger.warning(
+                        "Dropping switch state %s (ConfigID=%s): busbars "
+                        "without an external grid: %s",
+                        s_switch_state_short_id,
+                        s_switch_state_config_id,
+                        format_islands(l_islands),
+                    )
+                    for o_payload in _build_islanded_switch_state_payloads(
+                            sid=s_switch_state_short_id,
+                            cfg=s_switch_state_config_id,
+                            global_idx=i_global_row_index,
+                            islands=l_islands,
+                    ):
+                        yield o_payload
+                    continue
 
                 l_switch_state_payloads = []
                 i_randomized_scenarios_seen = 0

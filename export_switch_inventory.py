@@ -35,7 +35,31 @@ FIELDS = [
     "connected_object_name",
     "connected_object_full_name",
     "current_switch_state",
+    # Added in v3.4.1 for the offline islanding check
+    # (check_switch_state_islands.py):
+    "connected_object_outserv",
+    "connected_object_terminal_full_names",
 ]
+
+TERMINAL_SEPARATOR = "|"
+
+
+def _get_connected_object_terminal_full_names(o_connected) -> str:
+    """
+    Returns the full names of all terminals the object is connected to,
+    joined by TERMINAL_SEPARATOR, in the order bus1, bus2, bus3, bushv,
+    busmv, buslv. Ends without a switch are included too.
+    """
+
+    l_names = []
+    for s_attribute in PFAttr.CUBICLE_ATTR_CANDIDATES:
+        o_cubicle = get_pf_attribute(o_connected, s_attribute)
+        if o_cubicle is None:
+            continue
+        o_terminal = get_pf_attribute(o_cubicle, PFAttr.CTERM)
+        if o_terminal is not None:
+            l_names.append(get_safe_full_name(o_terminal))
+    return TERMINAL_SEPARATOR.join(l_names)
 
 
 def main() -> int:
@@ -101,6 +125,16 @@ def main() -> int:
                     o_switch,
                     PFAttr.SWITCH_STATE,
                     "",
+                ),
+                "connected_object_outserv": get_pf_attribute(
+                    o_connected,
+                    PFAttr.OUTSERV,
+                    "",
+                ),
+                "connected_object_terminal_full_names": (
+                    _get_connected_object_terminal_full_names(o_connected)
+                    if o_connected is not None
+                    else ""
                 ),
             })
 

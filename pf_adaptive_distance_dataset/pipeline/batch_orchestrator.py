@@ -175,6 +175,7 @@ def _validate_scenario_coverage(
         "short_circuit_current_invalid",
         "extreme_zone2_target_to_base_ratio",
         "persistent_switch_state_extreme_zone2",
+        "islanded_switch_state",
     }
     for d_skipped in skipped:
         if not isinstance(d_skipped, dict):

@@ -37,7 +37,7 @@ class Config:
     SLAVE_STUDY_CASE_PREFIX = "SC_Slave"
     SLAVE_OPERATION_SCENARIO_PREFIX = "OS_Slave"
 
-    DATASET_VERSION = "v3.4.0"
+    DATASET_VERSION = "v3.4.1"
     DATASET_EXPORT_TYPE = "streaming_graph_array_with_metadata"
 
     # --- Normal Run Controls (used when main_script.py is launched directly) ---

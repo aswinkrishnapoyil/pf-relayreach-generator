@@ -20,6 +20,23 @@ and its 216-state switch-state library (`switch_state/switch_states.csv`). With
 the default configuration it regenerates the 14-bus development dataset of the
 MSc thesis. It does **not** contain an ML model or PowerFactory binaries.
 
+### Version v3.4.1
+
+- New **islanding check**. A switch state that leaves any busbar or junction
+  node of the traced grid without a connection to an external grid
+  (`ElmXnet`) is omitted completely, with reason `islanded_switch_state`.
+  In v3.4.0 the relays in such an island were exported as ordinary terminal
+  corridors (Zone 2 at 120 % of the corridor, no Zone 3, no infeed
+  correction), although the island has no grid supply. In the 14-bus library
+  this concerns `ss_0180` (busbars 7 and 8) and `ss_0192` (busbars 10 and 11).
+  See [Islanded switch states](#islanded-switch-states).
+- New script `check_switch_state_islands.py` lists the islanded switch states
+  of a library offline, before a run.
+- `export_switch_inventory.py` adds the columns `connected_object_outserv` and
+  `connected_object_terminal_full_names`, which the offline check needs.
+- No setting rule changes. A v3.4.0 dataset is valid for v3.4.1 once the
+  scenarios of islanded switch states are removed.
+
 ### Version v3.4.0
 
 - Zone 3 selects the valid downstream branch with the **largest reactance**;
@@ -43,6 +60,7 @@ MSc thesis. It does **not** contain an ML model or PowerFactory binaries.
 pf-relayreach-generator/
 ├── main_script.py                         # pipeline entry point
 ├── export_switch_inventory.py             # lists the switches of a grid (for new libraries)
+├── check_switch_state_islands.py          # lists switch states that create islands (offline)
 ├── time_generation_steps.py               # times the generation steps per case
 ├── powerfactory.example.json              # local connection template
 ├── requirements.txt
@@ -67,12 +85,14 @@ pf-relayreach-generator/
 │   │   ├── topology.py                    # line, terminal and cubicle helpers
 │   │   ├── network_topology.py            # corridors, branches and parallels
 │   │   ├── dg_utils.py                    # DG discovery and capacity handling
+│   │   ├── islanding.py                   # supply check against external grids
 │   │   ├── zone_reach.py                  # Zone 1/2/3 reach calculations
 │   │   └── infeed.py                      # DG short circuit infeed correction
 │   ├── pipeline/
 │   │   ├── batch_orchestrator.py          # workers, restart, resume and merge
 │   │   ├── dataset_generator.py           # base/randomized scenario loop
 │   │   ├── switch_states.py               # switch loading and application
+│   │   ├── switch_state_islands.py        # offline islanding check of a library
 │   │   ├── randomization.py               # line and DG randomization
 │   │   └── case_features.py               # directed-relay feature rows
 │   ├── graph/
@@ -181,6 +201,29 @@ created the library. Use the user-independent form for new libraries; the
 ```powershell
 python -B .\export_switch_inventory.py --output .\Results\switch_inventory.csv
 ```
+
+Then check the library for switch states that cut busbars off from every
+external grid. This needs no PowerFactory:
+
+```powershell
+python -B .\check_switch_state_islands.py --inventory .\Results\switch_inventory.csv --output .\Results\islanded_switch_states.csv
+```
+
+The script prints each islanded switch state with its `ss_<n>` ID, row number,
+`ConfigID` and island busbars, and exits with code 1 if it finds any (0
+otherwise). `--library <csv>` checks another library than
+`switch_state/switch_states.csv`. `--write-clean-library <new csv>` writes a
+copy without those rows; removing rows shifts the `ss_<n>` numbers of later
+switch states. Input files are never changed and existing output files are
+never overwritten. The generator omits islanded switch states in any case;
+the script only lets you see and clean them beforehand.
+
+The inventory must come from `export_switch_inventory.py` v3.4.1 or later.
+Limits of the offline check, which the generator's own check does not have:
+a line without any switch does not appear in the inventory and can make a
+supplied part look like an island; an external grid outside the configured
+grid (behind a transformer) is not seen, and the script then stops with
+"no external grid"; couplers (`ElmCoup`) are treated as closed.
 
 Before dataset generation, verify the library against a non-production copy of
 the project and confirm switch application, electrical validity and
@@ -372,6 +415,39 @@ is a supervisor-approved dataset-admissibility rule, not a universal
 relay-setting limit. The generator does not cap Zone 2, remove only the failing
 relay, or force Zone-2/Zone-3 ordering.
 
+### Islanded switch states
+
+The setting rules assume that every part of the grid is supplied. After a
+switch state is applied, and before its base scenario is processed, the
+generator checks that every terminal at the end of an available line inside
+the configured grid is connected to at least one source:
+
+- connections are in-service lines with both cubicle switches closed (the
+  lines the corridor tracing uses), closed in-service couplers (`ElmCoup`) and
+  in-service transformers (`ElmTr2`, `ElmTr3`), also outside the configured
+  grid, so an external grid behind a transformer still counts;
+- sources are in-service external grids (`ElmXnet`, `bus_typ` 113) whose
+  cubicle switch is closed. DG units are not sources.
+
+Line and DG randomization do not change the topology, so one check covers all
+scenarios of a switch state. If any terminal is unsupplied, the switch state
+contributes no scenario. Every expected scenario gets its own skip record, so
+the coverage check of the batch still holds:
+
+```json
+{
+  "scenario_uid": "ss_0180_base_0000",
+  "switch_state_row_index": 180,
+  "switch_state_config_id": "<ConfigID>",
+  "reason": "islanded_switch_state",
+  "detail": "Switch state leaves busbars without a connection to any external grid: [Terminal_HV_7, Terminal_HV_8]",
+  "island_terminals": [["Terminal_HV_7", "Terminal_HV_8"]]
+}
+```
+
+A busbar that is cut off from every line is not reported, because no relay is
+traced there.
+
 ### Line and DG randomization
 
 - All eligible lines receive independent length scaling in `[0.8, 1.2]`.
@@ -387,6 +463,8 @@ PowerFactory line types are never edited in place.
 
 ### Failure and integrity handling
 
+- Switch states that leave busbars without an external grid are omitted
+  completely (see [Islanded switch states](#islanded-switch-states)).
 - Required short-circuit execution/current failures omit the complete affected
   scenario, record the reason and allow later realizations to continue.
 - Partial correction results and stale-current fallbacks never become labels.

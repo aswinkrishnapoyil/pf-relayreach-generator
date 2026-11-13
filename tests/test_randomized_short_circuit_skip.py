@@ -129,6 +129,8 @@ class RandomizedShortCircuitSkipTest(unittest.TestCase):
                 generator, "capture_original_state_from_active_slave",
                 return_value=({}, {}, {}, {}, {}, [], [], {}),
             ))
+            # v3.4.1: the switch state is supplied (no islands).
+            o_stack.enter_context(patch.object(generator, "_find_switch_state_islands", return_value=[]))
             o_stack.enter_context(patch.object(generator, "_process_single_scenario", side_effect=fake_process))
             o_cleanup = o_stack.enter_context(patch.object(generator, "_cleanup_after_scenario"))
             o_stack.enter_context(patch.object(generator, "delete_slave_case_pair"))

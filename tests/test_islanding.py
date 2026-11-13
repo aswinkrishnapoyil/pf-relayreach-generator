@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-import check_switch_state_islands
+from tools import check_switch_state_islands
 from pf_adaptive_distance_dataset.core.config import Config, PFAttr
 from pf_adaptive_distance_dataset.core.models import (
     DatasetStatistics,

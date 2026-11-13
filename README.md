@@ -20,6 +20,14 @@ and its 216-state switch-state library (`switch_state/switch_states.csv`). With
 the default configuration it regenerates the 14-bus development dataset of the
 MSc thesis. It does **not** contain an ML model or PowerFactory binaries.
 
+### Unreleased
+
+- The helper scripts `export_switch_inventory.py`,
+  `check_switch_state_islands.py` and `time_generation_steps.py` moved to
+  `tools/`. Run them from the repository root, e.g.
+  `python -B .\tools\export_switch_inventory.py`. Their options are unchanged;
+  `--generator` of the timing script now defaults to this repository.
+
 ### Version v3.4.1
 
 - New **islanding check**. A switch state that leaves any busbar or junction
@@ -59,10 +67,11 @@ MSc thesis. It does **not** contain an ML model or PowerFactory binaries.
 ```text
 pf-relayreach-generator/
 ├── main_script.py                         # pipeline entry point
-├── export_switch_inventory.py             # lists the switches of a grid (for new libraries)
-├── check_switch_state_islands.py          # lists switch states that create islands (offline)
-├── time_generation_steps.py               # times the generation steps per case
 ├── powerfactory.example.json              # local connection template
+├── tools/
+│   ├── export_switch_inventory.py         # lists the switches of a grid (for new libraries)
+│   ├── check_switch_state_islands.py      # lists switch states that create islands (offline)
+│   └── time_generation_steps.py           # times the generation steps per case
 ├── requirements.txt
 ├── LICENSE
 ├── grid/
@@ -168,7 +177,7 @@ states are identical to the library of the thesis run (SHA-256
 `3ade501b308efa7e…`), which used user-bound IDs of the same switches.
 
 For another grid, replace it with that grid's library. The neutral schema
-example shows the format, and `export_switch_inventory.py` lists the switch
+example shows the format, and `tools/export_switch_inventory.py` lists the switch
 identifiers of the configured grid:
 
 ```powershell
@@ -199,14 +208,14 @@ created the library. Use the user-independent form for new libraries; the
 `user_independent_switch_id` column of the inventory lists it:
 
 ```powershell
-python -B .\export_switch_inventory.py --output .\Results\switch_inventory.csv
+python -B .\tools\export_switch_inventory.py --output .\Results\switch_inventory.csv
 ```
 
 Then check the library for switch states that cut busbars off from every
 external grid. This needs no PowerFactory:
 
 ```powershell
-python -B .\check_switch_state_islands.py --inventory .\Results\switch_inventory.csv --output .\Results\islanded_switch_states.csv
+python -B .\tools\check_switch_state_islands.py --inventory .\Results\switch_inventory.csv --output .\Results\islanded_switch_states.csv
 ```
 
 The script prints each islanded switch state with its `ss_<n>` ID, row number,
@@ -576,14 +585,14 @@ signature. A run ID is a timestamp identifier, not a filesystem path.
 
 ## Timing the generation steps
 
-`time_generation_steps.py` runs a small generation (default: switch states 1–3,
+`tools/time_generation_steps.py` runs a small generation (default: switch states 1–3,
 the base case and four randomized cases each) in one PowerFactory session and
 records how long each step of every case takes. The generator code is not
 modified; the timers are attached in memory and the output goes to
 `Results/step_timing_<time>/`.
 
 ```powershell
-python -B .\time_generation_steps.py --generator .
+python -B .\tools\time_generation_steps.py
 ```
 
 ---

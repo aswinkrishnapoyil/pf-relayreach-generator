@@ -20,13 +20,15 @@ and its 216-state switch-state library (`switch_state/switch_states.csv`). With
 the default configuration it regenerates the 14-bus development dataset of the
 MSc thesis. It does **not** contain an ML model or PowerFactory binaries.
 
-### Unreleased
+### Version v3.4.2
 
 - The helper scripts `export_switch_inventory.py`,
   `check_switch_state_islands.py` and `time_generation_steps.py` moved to
   `tools/`. Run them from the repository root, e.g.
   `python -B .\tools\export_switch_inventory.py`. Their options are unchanged;
   `--generator` of the timing script now defaults to this repository.
+- No change to the generation rules or the dataset. Apart from
+  `dataset_version`, a v3.4.2 run gives the same data as v3.4.1.
 
 ### Version v3.4.1
 

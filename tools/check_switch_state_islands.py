@@ -1,11 +1,11 @@
-"""
+r"""
 Lists the switch states of a library that leave busbars without an external
 grid. Runs offline, without PowerFactory.
 
 Usage:
-  python -B .\\check_switch_state_islands.py --inventory switch_inventory.csv
-      [--library switch_state\\switch_states.csv] [--output islands.csv]
-      [--write-clean-library switch_state\\switch_states_clean.csv]
+  python -B .\tools\check_switch_state_islands.py --inventory switch_inventory.csv
+      [--library switch_state\switch_states.csv] [--output islands.csv]
+      [--write-clean-library switch_state\switch_states_clean.csv]
 
 The inventory must come from export_switch_inventory.py v3.4.1 or later.
 Exit code 0: no islands found. Exit code 1: islands found.
@@ -15,7 +15,11 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
+
+# Run from tools/: make the generator package in the repository root importable.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pf_adaptive_distance_dataset.core.config import SWITCH_STATE_FILE
 from pf_adaptive_distance_dataset.pipeline.switch_state_islands import (

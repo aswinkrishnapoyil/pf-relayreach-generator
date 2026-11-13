@@ -1,8 +1,18 @@
+r"""
+Exports a read-only switch inventory of the configured PowerFactory grid.
+
+Usage (from the repository root):
+  python -B .\tools\export_switch_inventory.py --output .\Results\switch_inventory.csv
+"""
 from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from pathlib import Path
+
+# Run from tools/: make the generator package in the repository root importable.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pf_adaptive_distance_dataset.core.config import Config, PFAttr
 from pf_adaptive_distance_dataset.pf_api.pf_session import PowerFactorySession

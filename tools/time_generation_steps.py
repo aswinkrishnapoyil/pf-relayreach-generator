@@ -1,12 +1,12 @@
-"""Time the steps of the reference generation per network state (case).
+r"""Time the steps of the reference generation per network state (case).
 
-  python time_generation_steps.py --generator C:\\path\\to\\pf-relayreach-generator-v3.4.0
+  python -B .\tools\time_generation_steps.py [--generator <generator folder>]
 
-Runs a small generation with the unchanged generator (v3.4.0) in one
+Runs a small generation with the unchanged generator in one
 PowerFactory session and measures, for every case, how long its steps take.
 The generator files are not modified: the timers are attached in memory, and
 the run writes only to a new folder Results/step_timing_<time>/ inside the
-generator folder (ignored by verify_release.py). Default: switch states 1-3,
+generator folder. Default: switch states 1-3,
 the base case and 4 randomized cases each (15 cases, about 15-20 minutes).
 
 Steps (inclusive wall-clock seconds per case):
@@ -167,7 +167,7 @@ def write_results(p_out: Path, d_info: dict):
 
 def main():
     o_p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    o_p.add_argument("--generator", type=Path, required=True, help="folder of pf-relayreach-generator-v3.4.0")
+    o_p.add_argument("--generator", type=Path, default=Path(__file__).resolve().parents[1], help="generator folder (default: this repository)")
     o_p.add_argument("--start-switch-state", type=int, default=1)
     o_p.add_argument("--end-switch-state", type=int, default=3)
     o_p.add_argument("--randomized", type=int, default=4, help="randomized cases per switch state (run used 25)")

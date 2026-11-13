@@ -28,10 +28,6 @@ MSc thesis. It does **not** contain an ML model or PowerFactory binaries.
 pf-relayreach-generator/
 ├── main_script.py                         # pipeline entry point
 ├── powerfactory.example.json              # local connection template
-├── tools/
-│   ├── export_switch_inventory.py         # lists the switches of a grid (for new libraries)
-│   ├── check_switch_state_islands.py      # lists switch states that create islands (offline)
-│   └── time_generation_steps.py           # times the generation steps per case
 ├── requirements.txt
 ├── LICENSE
 ├── grid/

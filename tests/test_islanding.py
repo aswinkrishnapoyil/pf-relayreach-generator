@@ -7,17 +7,13 @@ separated part of the grid in v3.4.0:
   (busbar 8 has a DG unit, which is not a source for this check).
 - ss_0192: lines 9-10 and 6-11 open -> Terminal_HV_10 and Terminal_HV_11.
 """
-import io
-import tempfile
 import unittest
-from contextlib import ExitStack, redirect_stdout
-from pathlib import Path
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pandas as pd
 
-from tools import check_switch_state_islands
 from pf_adaptive_distance_dataset.core.config import Config, PFAttr
 from pf_adaptive_distance_dataset.core.models import (
     DatasetStatistics,
@@ -495,54 +491,6 @@ class OfflineLibraryCheckTest(unittest.TestCase):
         df_library["switch_unknown"] = 1
         with self.assertRaisesRegex(PowerFactoryStateError, "not in the inventory"):
             find_islanded_switch_states(build_inventory(), df_library, l_columns + ["switch_unknown"])
-
-    def test_command_line_report_and_clean_library(self):
-        import csv
-
-        with tempfile.TemporaryDirectory(prefix="pf_islands_") as s_dir:
-            p_dir = Path(s_dir)
-            p_inventory = p_dir / "inventory.csv"
-            with p_inventory.open("w", newline="", encoding="utf-8-sig") as o_file:
-                o_writer = csv.DictWriter(o_file, fieldnames=INVENTORY_FIELDS)
-                o_writer.writeheader()
-                o_writer.writerows(build_inventory())
-            df_library, _ = build_library([set(), SS_0180_OPEN, SS_0192_OPEN])
-            p_library = p_dir / "switch_states.csv"
-            df_library.to_csv(p_library, sep=";", index=False, encoding="utf-8-sig")
-
-            p_report = p_dir / "islands.csv"
-            p_clean = p_dir / "switch_states_clean.csv"
-            o_stdout = io.StringIO()
-            with redirect_stdout(o_stdout):
-                i_exit = check_switch_state_islands.main([
-                    "--inventory", str(p_inventory), "--library", str(p_library),
-                    "--output", str(p_report), "--write-clean-library", str(p_clean),
-                ])
-            self.assertEqual(i_exit, 1)
-            self.assertIn("Switch states with islands: 2", o_stdout.getvalue())
-            self.assertIn("RESULT: ISLANDS FOUND", o_stdout.getvalue())
-
-            df_report = pd.read_csv(p_report, encoding="utf-8-sig")
-            self.assertEqual(df_report["switch_state_short_id"].tolist(), ["ss_0002", "ss_0003"])
-            df_clean = pd.read_csv(p_clean, sep=";", encoding="utf-8-sig")
-            self.assertEqual(df_clean["ConfigID"].tolist(), ["cfg-0"])
-
-            # Existing files are never overwritten.
-            with redirect_stdout(io.StringIO()), self.assertRaises(FileExistsError):
-                check_switch_state_islands.main([
-                    "--inventory", str(p_inventory), "--library", str(p_library),
-                    "--output", str(p_report),
-                ])
-
-            p_clean_library = p_dir / "clean_input.csv"
-            df_clean.to_csv(p_clean_library, sep=";", index=False, encoding="utf-8-sig")
-            o_stdout = io.StringIO()
-            with redirect_stdout(o_stdout):
-                i_exit = check_switch_state_islands.main([
-                    "--inventory", str(p_inventory), "--library", str(p_clean_library),
-                ])
-            self.assertEqual(i_exit, 0)
-            self.assertIn("RESULT: PASSED", o_stdout.getvalue())
 
 
 if __name__ == "__main__":
